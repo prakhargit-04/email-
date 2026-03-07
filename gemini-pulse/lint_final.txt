@@ -1,0 +1,28 @@
+
+> gemini-pulse@0.1.0 lint
+> eslint
+
+
+C:\Users\PRAKHAR BHARDWAJ\OneDrive\Attachments\gemini mdp\gemini-pulse\src\app\dashboard\ThemeToggle.tsx
+  13:9   error    Definition for rule 'react-compiler/react-compiler' was not found                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      react-compiler/react-compiler
+  13:9   warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/exhaustive-deps')
+  16:13  error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\PRAKHAR BHARDWAJ\OneDrive\Attachments\gemini mdp\gemini-pulse\src\app\dashboard\ThemeToggle.tsx:16:13
+  14 |         const saved = localStorage.getItem("gemini-pulse-theme");
+  15 |         if (saved === "light") {
+> 16 |             setDark(false);
+     |             ^^^^^^^ Avoid calling setState() directly within an effect
+  17 |             document.documentElement.classList.remove("dark");
+  18 |             document.documentElement.classList.add("light");
+  19 |         } else {  react-hooks/set-state-in-effect
+
+✖ 3 problems (2 errors, 1 warning)
+  0 errors and 1 warning potentially fixable with the `--fix` option.
+
