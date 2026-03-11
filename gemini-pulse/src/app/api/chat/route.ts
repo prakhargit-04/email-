@@ -22,12 +22,68 @@ Keep responses professional, warm, and efficient.`,
 Keep responses concise, professional, and results-oriented.`,
 };
 
+const MAX_RETRIES = 2;
+
+async function callGeminiWithRetry(
+    apiKey: string,
+    role: string,
+    messages: { role: string; content: string }[]
+): Promise<string> {
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const systemPrompt = ROLE_SYSTEM[role] ?? ROLE_SYSTEM.student;
+
+    const conversationParts = messages.map((m) => ({
+        role: m.role === "user" ? ("user" as const) : ("model" as const),
+        parts: [{ text: m.content }],
+    }));
+
+    const chat = model.startChat({
+        history: [
+            { role: "user", parts: [{ text: `System: ${systemPrompt}` }] },
+            { role: "model", parts: [{ text: "Understood! I'm ready to help. What can I do for you?" }] },
+            ...conversationParts.slice(0, -1),
+        ],
+    });
+
+    const lastMessage = messages[messages.length - 1];
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        try {
+            const result = await chat.sendMessage(lastMessage.content);
+            return result.response.text();
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
+            const is429 = msg.includes("429") || msg.includes("Too Many Requests");
+            const isDailyQuota = msg.includes("limit: 0") || msg.includes("PerDay");
+
+            // If daily quota is exhausted, don't retry — it won't help
+            if (is429 && isDailyQuota) {
+                throw new Error("QUOTA_EXHAUSTED");
+            }
+
+            // For per-minute rate limits, retry after a delay
+            if (is429 && attempt < MAX_RETRIES) {
+                const delay = (attempt + 1) * 3000; // 3s, 6s
+                await new Promise((r) => setTimeout(r, delay));
+                continue;
+            }
+
+            throw err;
+        }
+    }
+
+    throw new Error("Max retries exceeded");
+}
+
 export async function POST(req: NextRequest) {
     try {
         const apiKey = process.env.GEMINI_API_KEY;
         if (!apiKey) {
-            console.error("Chat API Error: GEMINI_API_KEY is not set");
-            return NextResponse.json({ error: "Missing GEMINI_API_KEY — please add it to your environment variables." }, { status: 500 });
+            return NextResponse.json(
+                { error: "API key not configured. Please add GEMINI_API_KEY to Vercel environment variables and redeploy." },
+                { status: 500 }
+            );
         }
 
         const body = await req.json();
@@ -38,35 +94,29 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "No messages provided" }, { status: 400 });
         }
 
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-
-        const systemPrompt = ROLE_SYSTEM[role] ?? ROLE_SYSTEM.student;
-
-        // Build conversation history for Gemini
-        const conversationParts = messages.map((m) => ({
-            role: m.role === "user" ? "user" as const : "model" as const,
-            parts: [{ text: m.content }],
-        }));
-
-        const chat = model.startChat({
-            history: [
-                { role: "user", parts: [{ text: `System: ${systemPrompt}` }] },
-                { role: "model", parts: [{ text: "Understood! I'm ready to help. What can I do for you?" }] },
-                ...conversationParts.slice(0, -1),
-            ],
-        });
-
-        const lastMessage = messages[messages.length - 1];
-        const result = await chat.sendMessage(lastMessage.content);
-        const reply = result.response.text();
-
+        const reply = await callGeminiWithRetry(apiKey, role, messages);
         return NextResponse.json({ reply });
     } catch (error: unknown) {
         const errMsg = error instanceof Error ? error.message : String(error);
         console.error("Chat API Error:", errMsg);
+
+        // Return user-friendly messages
+        if (errMsg === "QUOTA_EXHAUSTED") {
+            return NextResponse.json(
+                { error: "Daily API quota exhausted. Your free-tier Gemini API limit has been reached. Please try again tomorrow, or create a new API key from a NEW Google Cloud project at aistudio.google.com/apikey and update it in Vercel." },
+                { status: 429 }
+            );
+        }
+
+        if (errMsg.includes("429")) {
+            return NextResponse.json(
+                { error: "Rate limited — too many requests. Please wait a minute and try again." },
+                { status: 429 }
+            );
+        }
+
         return NextResponse.json(
-            { error: `Gemini chat failed: ${errMsg}` },
+            { error: `Something went wrong: ${errMsg.slice(0, 200)}` },
             { status: 500 }
         );
     }
