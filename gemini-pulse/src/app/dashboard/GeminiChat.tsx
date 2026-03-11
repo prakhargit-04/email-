@@ -49,19 +49,24 @@ export default function GeminiChat({ userRole }: { userRole: string }) {
                 }),
             });
 
-            if (!res.ok) throw new Error(await res.text());
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({ error: res.statusText }));
+                throw new Error(errorData.error || `Request failed (${res.status})`);
+            }
             const data = await res.json();
 
             setMessages((prev) => [
                 ...prev,
                 { role: "assistant", content: data.reply },
             ]);
-        } catch {
+        } catch (err: unknown) {
+            const errMsg = err instanceof Error ? err.message : "Unknown error";
+            console.error("GeminiChat error:", errMsg);
             setMessages((prev) => [
                 ...prev,
                 {
                     role: "assistant",
-                    content: "Sorry, I encountered an error. Please try again.",
+                    content: `⚠️ Error: ${errMsg}. Please try again.`,
                 },
             ]);
         } finally {

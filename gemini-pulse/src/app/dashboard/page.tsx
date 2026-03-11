@@ -98,6 +98,25 @@ const ROLE_CONFIG: Record<
     },
 };
 
+// Widget filter keyword maps (per role)
+const WIDGET_FILTERS: Record<string, Record<string, (e: PulseEmail) => boolean>> = {
+    student: {
+        Scholarships: (e) => /scholar|financial aid|fee|tuition|grant|bursary/i.test(`${e.subject} ${e.snippet}`),
+        Deadlines: (e) => /deadline|due date|submission|assignment|exam|quiz|test|graded/i.test(`${e.subject} ${e.snippet}`),
+        "Scam Alerts": (e) => e.analysis.category === "Scam",
+    },
+    teacher: {
+        "Parent Emails": (e) => /parent|guardian|mother|father|pta|parent-teacher/i.test(`${e.subject} ${e.from} ${e.snippet}`),
+        "Admin Notices": (e) => /admin|principal|policy|directive|memo|notice/i.test(`${e.subject} ${e.from} ${e.snippet}`) || e.analysis.category === "Scam",
+        Grading: (e) => /grad|report card|assessment|evaluation|marks|exam paper/i.test(`${e.subject} ${e.snippet}`),
+    },
+    corporate: {
+        "Client Urgency": (e) => /client|customer|account manager|escalation|sla/i.test(`${e.subject} ${e.from} ${e.snippet}`) || e.analysis.score >= 80,
+        "Fraud Detection": (e) => e.analysis.category === "Scam",
+        Meetings: (e) => /meeting|calendar|standup|sync|1:1|invite/i.test(`${e.subject} ${e.snippet}`),
+    },
+};
+
 export default function Dashboard() {
     const { data: session, status } = useSession();
     const router = useRouter();
@@ -107,6 +126,7 @@ export default function Dashboard() {
     const [visibleCount, setVisibleCount] = useState(5);
     const [error, setError] = useState<string | null>(null);
     const [toast, setToast] = useState<PulseEmail | null>(null);
+    const [activeFilter, setActiveFilter] = useState<string | null>(null);
 
     const config = ROLE_CONFIG[role] ?? ROLE_CONFIG.student;
     const Icon = config.icon;
@@ -122,7 +142,14 @@ export default function Dashboard() {
         return { scams, high };
     }, [emails]);
 
-    const displayedEmails = useMemo(() => emails.slice(0, visibleCount), [emails, visibleCount]);
+    const filteredEmails = useMemo(() => {
+        if (!activeFilter) return emails;
+        const filterFn = WIDGET_FILTERS[role]?.[activeFilter];
+        if (!filterFn) return emails;
+        return emails.filter(filterFn);
+    }, [emails, activeFilter, role]);
+
+    const displayedEmails = useMemo(() => filteredEmails.slice(0, visibleCount), [filteredEmails, visibleCount]);
 
     useEffect(() => {
         const savedRole = localStorage.getItem("gemini-pulse-role");
@@ -208,13 +235,13 @@ export default function Dashboard() {
                             <Icon className="h-5 w-5" style={{ color: config.accent }} />
                         </motion.div>
                         <div>
-    <div className="text-xl font-extrabold tracking-widest text-zinc-900 dark:text-white">
-        PRIION
-    </div>
-    <div className="text-[10px] font-bold tracking-widest text-zinc-500 uppercase">
-        Prioritise what matters
-    </div>
-</div>
+                            <div className="text-xl font-extrabold tracking-widest text-zinc-900 dark:text-white">
+                                PRIION
+                            </div>
+                            <div className="text-[10px] font-bold tracking-widest text-zinc-500 uppercase">
+                                Prioritise what matters
+                            </div>
+                        </div>
                     </div>
                     <div className={`role-badge ${config.badgeClass}`}>
                         {config.emoji} {config.label}
@@ -252,19 +279,29 @@ export default function Dashboard() {
                 <div className="grid gap-4 sm:grid-cols-3 mb-6">
                     {config.widgets.map((w, i) => {
                         const WIcon = w.icon;
+                        const isActive = activeFilter === w.label;
+                        const filterFn = WIDGET_FILTERS[role]?.[w.label];
+                        const matchCount = filterFn ? emails.filter(filterFn).length : 0;
                         return (
                             <motion.div
                                 key={w.label}
                                 initial={{ opacity: 0, y: 16 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: i * 0.1 }}
-                                className="glass rounded-2xl p-4"
+                                onClick={() => {
+                                    setActiveFilter(isActive ? null : w.label);
+                                    setVisibleCount(5);
+                                }}
+                                className={`glass rounded-2xl p-4 cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-lg ${isActive ? "ring-2 ring-offset-1 ring-offset-transparent" : "hover:bg-white/5"}`}
+                                style={isActive ? { boxShadow: `0 0 20px color-mix(in oklab, ${config.accent} 30%, transparent)` } : {}}
                             >
                                 <div className="flex items-center gap-3">
                                     <div
-                                        className="flex h-10 w-10 items-center justify-center rounded-xl"
+                                        className="flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-200"
                                         style={{
-                                            background: `color-mix(in oklab, ${config.accent} 12%, transparent)`,
+                                            background: isActive
+                                                ? `color-mix(in oklab, ${config.accent} 25%, transparent)`
+                                                : `color-mix(in oklab, ${config.accent} 12%, transparent)`,
                                         }}
                                     >
                                         <WIcon
@@ -272,12 +309,23 @@ export default function Dashboard() {
                                             style={{ color: config.accent }}
                                         />
                                     </div>
-                                    <div>
+                                    <div className="flex-1">
                                         <div className="text-xs text-zinc-400 uppercase tracking-wider">
                                             {w.label}
                                         </div>
-                                        <div className="text-sm font-semibold mt-0.5">{w.value}</div>
+                                        <div className="text-sm font-semibold mt-0.5">
+                                            {emails.length > 0 ? `${matchCount} found` : w.value}
+                                        </div>
                                     </div>
+                                    {isActive && (
+                                        <motion.div
+                                            initial={{ scale: 0 }}
+                                            animate={{ scale: 1 }}
+                                            className="flex h-6 w-6 items-center justify-center rounded-full bg-white/10"
+                                        >
+                                            <CheckCircle className="h-3.5 w-3.5" style={{ color: config.accent }} />
+                                        </motion.div>
+                                    )}
                                 </div>
                             </motion.div>
                         );
@@ -322,11 +370,22 @@ export default function Dashboard() {
                     <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
                         <div className="max-w-2xl">
                             <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
-                                Priority Sorter Dashboard
+                                {activeFilter ? activeFilter : "Priority Sorter Dashboard"}
                             </h1>
                             <p className="mt-2 text-sm text-zinc-300/80">
-                                Showing {displayedEmails.length} of {emails.length} unread messages — scored and summarized by Gemini.
+                                {activeFilter
+                                    ? `Showing ${displayedEmails.length} of ${filteredEmails.length} emails matching "${activeFilter}"`
+                                    : `Showing ${displayedEmails.length} of ${emails.length} unread messages — scored and summarized by Gemini.`
+                                }
                             </p>
+                            {activeFilter && (
+                                <button
+                                    onClick={() => { setActiveFilter(null); setVisibleCount(5); }}
+                                    className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-zinc-400 hover:text-white transition-colors"
+                                >
+                                    ← Show all emails
+                                </button>
+                            )}
                             {error && <p className="mt-3 text-sm text-red-300">{error}</p>}
                         </div>
 
@@ -369,11 +428,11 @@ export default function Dashboard() {
                                         : e.analysis.category === "High Priority" || e.analysis.score >= 80
                                             ? "glow-high"
                                             : "";
-                                
-                                const scoreColor = e.analysis.score >= 80 
-                                    ? "text-red-500 dark:text-red-400" 
-                                    : e.analysis.score >= 50 
-                                        ? "text-amber-500 dark:text-amber-400" 
+
+                                const scoreColor = e.analysis.score >= 80
+                                    ? "text-red-500 dark:text-red-400"
+                                    : e.analysis.score >= 50
+                                        ? "text-amber-500 dark:text-amber-400"
                                         : "text-emerald-500 dark:text-emerald-400";
 
                                 return (
@@ -386,14 +445,14 @@ export default function Dashboard() {
                                     >
                                         {/* PERFECTLY SYMMETRIC ROW NO OVERFLOW */}
                                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-6">
-                                            
+
                                             {/* LEFT: TEXT (Truncates instead of pushing out) */}
                                             <div className="min-w-0 flex-1 sm:pr-6 sm:border-r border-slate-200 dark:border-white/10">
                                                 <div className="truncate text-base font-bold group-hover:text-[var(--primary)] transition-colors">{e.subject}</div>
                                                 <div className="mt-1 truncate text-xs font-semibold text-zinc-500">{e.from}</div>
                                                 <div className="mt-3 line-clamp-2 text-sm text-zinc-400 leading-relaxed">{e.snippet}</div>
                                             </div>
-                                            
+
                                             {/* RIGHT: SCORE (Centered in a bounded column) */}
                                             <div className="flex shrink-0 flex-row sm:flex-col items-center justify-center gap-2 sm:w-[130px] pt-4 sm:pt-0 border-t sm:border-t-0 border-slate-200 dark:border-white/10">
                                                 <div className={`text-4xl font-black tracking-tighter ${scoreColor}`}>{e.analysis.score}</div>
@@ -414,7 +473,7 @@ export default function Dashboard() {
                     </div>
 
                     {/* Load More Button */}
-                    {emails.length > visibleCount && (
+                    {filteredEmails.length > visibleCount && (
                         <div className="mt-8 flex justify-center">
                             <button
                                 onClick={() => setVisibleCount(prev => prev + 5)}

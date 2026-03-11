@@ -160,9 +160,9 @@ export async function classifyEmailWithGemini(params: {
   if (!apiKey) throw new Error("Missing GEMINI_API_KEY.");
 
   const genAI = new GoogleGenerativeAI(apiKey);
-  
-  // FIX: Upgraded to the current supported model
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+  // FIX: Use stable GA model
+  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
   const role = params.userRole ?? "student";
   const roleBlock = ROLE_PROMPTS[role] ?? ROLE_PROMPTS.student;

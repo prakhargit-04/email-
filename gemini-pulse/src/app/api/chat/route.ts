@@ -26,7 +26,8 @@ export async function POST(req: NextRequest) {
     try {
         const apiKey = process.env.GEMINI_API_KEY;
         if (!apiKey) {
-            return NextResponse.json({ error: "Missing GEMINI_API_KEY" }, { status: 500 });
+            console.error("Chat API Error: GEMINI_API_KEY is not set");
+            return NextResponse.json({ error: "Missing GEMINI_API_KEY — please add it to your environment variables." }, { status: 500 });
         }
 
         const body = await req.json();
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
         }
 
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
         const systemPrompt = ROLE_SYSTEM[role] ?? ROLE_SYSTEM.student;
 
@@ -61,10 +62,11 @@ export async function POST(req: NextRequest) {
         const reply = result.response.text();
 
         return NextResponse.json({ reply });
-    } catch (error) {
-        console.error("Chat API Error:", error);
+    } catch (error: unknown) {
+        const errMsg = error instanceof Error ? error.message : String(error);
+        console.error("Chat API Error:", errMsg);
         return NextResponse.json(
-            { error: "Failed to get response from Gemini" },
+            { error: `Gemini chat failed: ${errMsg}` },
             { status: 500 }
         );
     }
