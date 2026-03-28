@@ -5,7 +5,7 @@
   <img src="https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
 </p>
 
-# ✨ Gemini Pulse — AI-Powered Inbox Intelligence
+# ✨ PRIION— AI-Powered Inbox Intelligence
 
 > **Smart email triage for Students, Teachers, and Corporate professionals.** Gemini Pulse connects to your Gmail, reads and scores every email using Google's Gemini 2.5 Flash AI, and surfaces what matters most — based on *who you are*.
 
@@ -13,7 +13,7 @@
 
 ## 🎯 What It Does
 
-Gemini Pulse is an AI-powered email dashboard that:
+PRIION is an AI-powered email dashboard that:
 
 - 📬 **Fetches all emails** from your Gmail inbox via Google OAuth
 - 🤖 **Analyzes each email** with Gemini 2.5 Flash AI for importance scoring
