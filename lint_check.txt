@@ -1,0 +1,10 @@
+
+> gemini-pulse@0.1.0 lint
+> eslint
+
+
+C:\Users\PRAKHAR BHARDWAJ\OneDrive\Attachments\gemini mdp\gemini-pulse\src\app\dashboard\ThemeToggle.tsx
+  7:10  warning  'getInitialDark' is defined but never used  @typescript-eslint/no-unused-vars
+
+✖ 1 problem (0 errors, 1 warning)
+
