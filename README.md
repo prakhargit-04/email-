@@ -25,7 +25,7 @@
 
 <br />
 
-[![Live Demo](https://img.shields.io/badge/▶_Live_Demo-email--4m6b.vercel.app-6366f1?style=for-the-badge)](https://email-4m6b.vercel.app)
+[![Live Demo](https://img.shields.io/badge/▶_Live_Demo-email--4m6b.vercel.app-6366f1?style=for-the-badge)](https://email-git-main-prakhargit-04s-projects.vercel.app/)
 
 <br />
 
